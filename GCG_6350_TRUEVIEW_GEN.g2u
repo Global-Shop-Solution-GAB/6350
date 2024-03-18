@@ -1,0 +1,711 @@
+Program.Sub.Preflight.Start
+v.Global.sProcessID.Declare
+v.Global.sWG.Declare
+v.Global.sFolder.Declare
+v.Global.iRefresh.Declare
+v.Global.iCutoff.Declare
+v.Global.sLogoPath.Declare
+
+
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+v.Local.sError.Declare
+f.Intrinsic.Control.Try
+	Function.Intrinsic.UI.UsePixels ' Allows you to use Pixels instead of Twips throughout
+
+	f.ODBC.Connection!conx.OpenCompanyConnection
+	f.Intrinsic.Control.CallSub(PIDCheck)
+	f.Intrinsic.Control.CallSub(FolderCheck)
+	f.Intrinsic.Control.CallSub(CheckMaint)
+'	f.Intrinsic.Control.CallSub(CommonDataTables)
+	f.Intrinsic.Control.CallSub(LoadData)
+	
+	f.Intrinsic.Control.CallSub("Unload")
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}GAB Version: {5}}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+'	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Debug.SetLA(v.Local.sError)
+	f.Intrinsic.Control.CallSub("Unload")
+F.Intrinsic.Control.EndTry	
+
+Program.Sub.Main.End
+
+
+
+
+Program.Sub.FolderCheck.Start
+v.Local.bEx.Declare
+f.Intrinsic.String.Build("{0}\CUSTOM",v.Caller.GlobalDir,v.Global.sFolder)
+f.Intrinsic.File.DirExists(v.Global.sFolder,v.Local.bEx)
+f.Intrinsic.Control.If(v.Local.bEx.Not)
+	f.Intrinsic.File.CreateDir(v.Global.sFolder)
+f.Intrinsic.Control.EndIf
+
+f.Intrinsic.String.Build("{0}\6350",v.Global.sFolder,v.Global.sFolder)
+f.Intrinsic.File.DirExists(v.Global.sFolder,v.Local.bEx)
+f.Intrinsic.Control.If(v.Local.bEx.Not)
+	f.Intrinsic.File.CreateDir(v.Global.sFolder)
+f.Intrinsic.Control.EndIf
+
+f.Intrinsic.String.Build("{0}\{1}",v.Global.sFolder,v.Caller.CompanyCode,v.Global.sFolder)
+f.Intrinsic.File.DirExists(v.Global.sFolder,v.Local.bEx)
+f.Intrinsic.Control.If(v.Local.bEx.Not)
+	f.Intrinsic.File.CreateDir(v.Global.sFolder)
+f.Intrinsic.Control.EndIf
+
+Program.Sub.FolderCheck.End
+
+Program.Sub.CheckMaint.Start
+v.Local.sError.Declare
+f.Intrinsic.Control.Try
+	
+'	f.Data.Datatable.CreateFromSQL("WgDT","Conx","Select WORK_GROUP from GCG_6350_HTML_CONFIG where enabled = 1 and LINE_TYPE = 'W'",true)
+'	f.Data.Dataview.Create("WgDT","WgVw")
+'	f.Data.DataView.ToString("WgDT","WgVw","","|",v.Global.sWG)
+'	f.Intrinsic.Control.If(v.DataTable.WgDT.RowCount,=,0)
+'		f.Intrinsic.Control.CallSub(Unload)
+'	f.Intrinsic.Control.EndIf
+	f.Data.Datatable.CreateFromSQL("ConfigDt","Conx","Select RTRIM(LOGO) as Logo,Refresh_rate,cutoff from GCG_6350_HTML_CONFIG")
+
+	f.Intrinsic.Control.If(v.DataTable.ConfigDt.RowCount,>,0)
+		v.Global.sLogoPath.Set(v.DataTable.ConfigDt(0).Logo!fieldValTrim)
+		v.Global.iRefresh.Set(v.DataTable.ConfigDt(0).Refresh_rate!fieldVal)
+		v.Global.iCutoff.Set(v.DataTable.ConfigDt(0).cutoff!fieldVal)
+	f.Intrinsic.Control.Else
+		v.Global.sLogoPath.Set("")
+		v.Global.iRefresh.Set(0)
+		v.Global.iCutoff.Set(0)
+	f.Intrinsic.Control.EndIf
+	
+	
+'	f.odbc.Connection!conx.ExecuteAndReturn("Select Refresh_Rate from GCG_6350_HTML_CONFIG where LINE_TYPE = 'R'",v.Global.iRefresh)
+'	f.odbc.Connection!conx.ExecuteAndReturn("Select Logo from GCG_6350_HTML_CONFIG where LINE_TYPE = 'P'",v.Global.sLogoPath)
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}GAB Version: {5}}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+'	F.Intrinsic.UI.Msgbox(V.Local.sError)	
+	f.Intrinsic.Debug.SetLA(v.Local.sError)
+	f.Intrinsic.Control.CallSub("Unload")
+F.Intrinsic.Control.EndTry
+Program.Sub.CheckMaint.End
+
+Program.Sub.UnLoad.Start
+V.Local.sError.Declare
+v.Local.sDescription.Declare
+v.Local.sSQL.Declare
+
+f.Intrinsic.Control.If(v.ODBC.conx.State,=,1)
+	F.ODBC.Connection!conX.close
+f.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.End
+Program.Sub.UnLoad.End
+
+Program.Sub.PIDCheck.Start
+V.Local.sError.Declare
+f.Intrinsic.Control.Try
+	
+	v.Local.bExists.Declare
+	v.Local.sWaitDiag.Declare
+	
+	'PID Check
+	f.Intrinsic.Control.If(v.Caller.Switches,<>,"O")
+	
+		F.Global.Registry.ReadValue("SUPERVSR",V.Caller.CompanyCode,"Running",6350,"2002",5,"",V.Global.sProcessID)
+		f.Intrinsic.String.Split(v.Global.sProcessID,"*!*",v.Global.sProcessID)
+		f.Intrinsic.task.PIDRunning(v.Global.sProcessID(0).Trim,v.Local.bExists)
+		f.Intrinsic.control.If(v.Local.bExists,=,True,"AND",v.Global.sProcessID(0).Trim,<>,"")	
+			f.Intrinsic.Control.CallSub("Unload")
+		f.Intrinsic.Control.EndIf
+		v.Global.sProcessID.Redim(0,0)
+		f.Intrinsic.String.Build("{0}*!*{1}",v.Ambient.PID,v.Ambient.Now,V.Global.sProcessID)
+		F.Global.Registry.AddValue("SUPERVSR",V.Caller.CompanyCode,"Running",6350,"2002",False,V.Global.sProcessID,False,0,-999.0,1/1/1980,12:00:00 AM)
+		f.Intrinsic.String.Build("QCIG and Outside services Trueview (6350) - {0}",v.Caller.CompanyCode,v.Local.sWaitDiag)
+		f.Intrinsic.UI.InvokeWaitDialog("Generating Trueview",v.Local.sWaitDiag)
+		'Get Options from the Option file
+		
+	f.Intrinsic.Control.EndIf	
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}GAB Version: {5}}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+'	F.Intrinsic.UI.Msgbox(V.Local.sError)	
+	f.Intrinsic.Debug.SetLA(v.Local.sError)
+	f.Intrinsic.Control.CallSub("Unload")
+F.Intrinsic.Control.EndTry
+Program.Sub.PIDCheck.End
+
+Program.Sub.LoadData.Start
+v.Local.sError.Declare
+f.Intrinsic.Control.Try
+	v.Local.bExist.Declare
+	v.Local.sAPSFile.Declare
+	v.Local.sAPSFileContent.Declare
+	v.Local.iCount.Declare
+	v.Local.sJSS.Declare
+	v.Local.sJob.Declare
+	V.Local.sSuffix.Declare
+	v.Local.sSeq.Declare
+	v.Local.sSort.Declare
+	v.Local.sPart.Declare
+	v.Local.sDescription.Declare
+	v.Local.fOrderQty.Declare
+	v.Local.fqtyClaimed.Declare
+	v.Local.sStartDate.Declare
+	v.Local.dStartDate.Declare
+	v.Local.sDueDate.Declare
+	v.Local.dDueDate.Declare
+	v.Local.sWG.Declare
+	v.Local.sCWC.declare
+	v.Local.sNWC.declare
+	v.Local.sReady.Declare
+	v.Local.fIdleDays.Declare
+	v.Local.sCurrOp.Declare
+	v.Local.sCurrOpSeq.Declare
+	v.Local.sNextOp.Declare
+	v.Local.sNextOpSeq.Declare
+	v.Local.sClockedIn.Declare
+	v.Local.sFilter.Declare
+	v.Local.sSortCriteria.Declare
+	v.Local.sOutPO.Declare
+	v.Local.dCutoff.Declare
+	v.Local.dHdatedue.Declare
+	v.Local.dPromiseDate.Declare
+	v.Local.sSql.Declare
+	v.Local.fClaimedPcs.Declare
+	v.Local.dlastSeqClose.Declare
+	v.Local.iCompare.Declare
+	
+	f.Intrinsic.string.Build("{0}\APSDL{1}",v.Caller.FilesDir,v.Caller.CompanyCode,v.Local.sAPSFile)
+
+	f.Data.Datatable.Create("DtTrueView",true)
+	f.Data.Datatable.AddColumn("DtTrueView","JSS","String")
+	f.Data.Datatable.AddColumn("DtTrueView","SORT","String")
+	f.Data.Datatable.AddColumn("DtTrueView","Part","String")
+	f.Data.Datatable.AddColumn("DtTrueView","Description","String")
+	f.Data.Datatable.AddColumn("DtTrueView","DueDate","Date")
+	f.Data.Datatable.AddColumn("DtTrueView","StartDate","Date")
+	f.Data.Datatable.AddColumn("DtTrueView","ParentDueDate","Date")
+	f.Data.Datatable.AddColumn("DtTrueView","OrdQty","Float")
+	f.Data.Datatable.AddColumn("DtTrueView","QtyClaimed","Float")
+	f.Data.Datatable.AddColumn("DtTrueView","IdleDays","Float")
+	f.Data.Datatable.AddColumn("DtTrueView","CurrOp","String")
+	f.Data.Datatable.AddColumn("DtTrueView","NextOp","String")
+	f.Data.Datatable.AddColumn("DtTrueView","WG","String")
+	f.Data.Datatable.AddColumn("DtTrueView","CWC","String")
+	f.Data.Datatable.AddColumn("DtTrueView","NWC","String")
+	f.Data.Datatable.AddColumn("DtTrueView","ClockedIn","String")
+	f.Data.Datatable.AddColumn("DtTrueView","OutPO","String")
+	f.Data.Datatable.AddColumn("DtTrueView","Compare","Float")
+'	f.Data.Datatable.AddColumn("DtTrueView","SORT2","Float")
+'	f.Data.Datatable.AddColumn("DtTrueView","FILTER_CHK","String")
+	
+	
+
+'	f.Data.Datatable.CreateFromSQL("DtOps","Conx","Select a.Job,a.Suffix,C.Code_sort,a.part,a.Description,a.qty_order,b.seq,b.LMO,d.status_flag,b.flag_closed,Case when b.LMO = 'L' then b.part else 'OPERATION' end as WCWG,Case when b.LMO = 'L' then b.Units_Complete else b.Hours_Actual end as PcsCompl,b.date_Start,b.Date_due from V_JOB_HEADER a inner join V_JOB_OPERATIONS b on a.job = b.job and a.suffix = b.suffix inner join V_INVENTORY_MSTR c on a.part = c.part left Join V_PO_WO_XREF d on b.job = d.wo and b.suffix = d.WO_suff and b.seq = d.WO_SEQ where a.Date_closed = '1900-01-01' and b.LMO in ('O','L') and b.seq < 990000")
+
+'	f.Data.Datatable.CreateFromSQL("DtOps","Conx","Select a.Job,a.Suffix,RTRIM(' ') as CodeSort,RTRIM(' ') as STATUS_FLAG,RTRIM(' ') as ClockedIn,a.part,a.part + a.location as partloc,a.Description,a.qty_order,b.seq,a.job+a.suffix+b.seq as JSSID,b.LMO,b.flag_closed,Case when b.LMO = 'L' then b.part else 'OPERATION' end as WCWG,Case when b.LMO = 'L' then b.Units_Complete else b.Hours_Actual end as PcsCompl,b.date_Start,b.Date_due from V_JOB_HEADER a inner join V_JOB_OPERATIONS b on a.job = b.job and a.suffix = b.suffix where a.Date_closed = '1900-01-01' and b.LMO in ('O','L') and b.seq < 990000 where case when b.LMO = 'L' then b.part in ('QCQI') End ")
+	
+'	f.Data.Datatable.CreateFromSQL("DtOps","Conx","Select a.Job,a.Suffix,RTRIM(' ') as CodeSort,RTRIM(' ') as STATUS_FLAG,RTRIM(' ') as ClockedIn,a.part,a.part + a.location as partloc,a.Description,a.qty_order,b.seq,a.job+a.suffix+b.seq as JSSID,b.LMO,b.flag_closed,Case when b.LMO = 'L' then RTRIM(b.part) else 'OPERATION' end as WCWG,Case when b.LMO = 'L' then b.Units_Complete else b.Hours_Actual end as PcsCompl,b.date_Start,b.Date_due from V_JOB_HEADER a inner join V_JOB_OPERATIONS b on a.job = b.job and a.suffix = b.suffix where a.Date_closed = '1900-01-01' and b.LMO in ('O','L') and b.seq < 990000 and b.part = case when b.LMO = 'O' then b.part When b.part in ('QCI','3DS','ASY','STMP','QCIG') then b.part else null end")
+
+
+	F.Intrinsic.Date.DateAdd("D",V.Global.iCutoff,V.Ambient.Date,V.Local.dCutoff)
+'	
+'	F.Intrinsic.String.Build("Select a.Job,a.Suffix,RTRIM(' ') as CodeSort,RTRIM(' ') as STATUS_FLAG,RTRIM(' ') as ClockedIn,a.part,a.part + a.location as partloc,a.Description,a.qty_order,b.seq,a.job+a.suffix+b.seq as JSSID,b.LMO,b.flag_closed,'OPERATION'  as WCWG,b.Hours_Actual as PcsCompl,b.date_Start,b.Date_due,(Select date_due from V_Job_header where job = a.job and suffix in ('000','')) as Parent_Date_due,a.date_due  as HDateDue from V_JOB_HEADER a inner join V_JOB_OPERATIONS b on a.job = b.job and a.suffix = b.suffix where a.Date_closed = '1900-01-01' and b.date_start <= '{0}' and b.LMO in ('O') and b.seq < 990000 and a.job+a.suffix+b.seq not in (select WO + WO_SUFF + WO_SEQ from V_PO_WO_XREF)",v.Local.dCutoff.PervasiveDate,v.Local.sSql)
+'	
+'	f.Data.Datatable.CreateFromSQL("Dtops","Conx",v.Local.sSql)
+'	
+'	F.Intrinsic.String.Build("Select a.Job,a.Suffix,RTRIM(' ') as CodeSort,RTRIM(' ') as STATUS_FLAG,RTRIM(' ') as ClockedIn,a.part,a.part + a.location as partloc,a.Description,a.qty_order,b.seq,a.job+a.suffix+b.seq as JSSID,b.LMO,b.flag_closed,RTRIM(b.part) as WCWG,b.Units_Complete as PcsCompl,b.date_Start,b.Date_due,(Select date_due from V_Job_header where job = a.job and suffix in ('000','')) as Parent_Date_due,a.date_due as HDateDue from V_JOB_HEADER a inner join V_JOB_OPERATIONS b on a.job = b.job and a.suffix = b.suffix where a.Date_closed = '1900-01-01' and  b.date_start <= '{0}' and b.LMO in ('L') and b.seq < 990000 and a.job + a.suffix in (select distinct job + suffix from V_job_Operations where LMO = 'L' and (part =  'QCIG' or Part in (Select Workcenter from WORKGROUP_LINE where workgroup = 'QCIG')) and  seq < 990000)",v.Local.dCutoff.PervasiveDate,v.Local.sSql)
+'	
+'	f.Data.Datatable.CreateFromSQL("DtLops","Conx",v.Local.sSql)
+'	
+'	f.Data.Datatable.Merge("DtLops","DTops",true,2)
+
+	
+	F.Intrinsic.String.Build("Select a.Job,a.Suffix,RTRIM(' ') as CodeSort,RTRIM(' ') as STATUS_FLAG,RTRIM('N') as ClockedIn,a.part,a.part + a.location as partloc,a.Description,a.qty_order,b.seq,a.job+a.suffix+b.seq as JSSID,b.LMO,b.flag_closed,Case when b.LMO = 'L' then RTRIM(b.part) else 'OPERATION' end as WCWG,concat('-',RTRIM(b.part)) as WC,Case when b.LMO = 'L' then b.Units_Complete else b.Hours_Actual end as PcsCompl,b.date_Start,b.Date_due,b.date_completed,(Select date_due from V_Job_header where job = a.job and suffix in ('000','')) as Parent_Date_due,a.date_due  as HDateDue from V_JOB_HEADER a inner join V_JOB_OPERATIONS b on a.job = b.job and a.suffix = b.suffix where a.Date_closed = '1900-01-01' and b.date_start <= '{0}' and b.LMO in ('O','L') and b.seq < 990000 ",v.Local.dCutoff.PervasiveDate,v.Local.sSql)
+	
+	f.Data.Datatable.CreateFromSQL("Dtops","Conx",v.Local.sSql)
+
+
+'	f.Data.Dictionary.CreateFromSQL("DictOrigPromDate","Conx","Select Job, substring(convert(Date_due,sql_char),6,2) + '/' + substring(convert(Date_due,sql_char),9,2) + '/' + substring(convert(Date_due,sql_char),1,4) from  V_JOB_HEADER where suffix in ('000','') and date_closed = '1900-01-01';")
+'	f.Data.Datatable.FillFromDictionary("DtOps","DictOrigPromDate","Job","Parent_Date_due")
+'	f.Data.Dictionary.Close("DictOrigPromDate")
+
+
+'	f.Data.Datatable.CreateFromSQL("DtOps","Conx","Select a.Job,a.Suffix,RTRIM(' ') as CodeSort,RTRIM(' ') as STATUS_FLAG,RTRIM(' ') as ClockedIn,a.part,a.part + a.location as partloc,a.Description,a.qty_order,b.seq,a.job+a.suffix+b.seq as JSSID,b.LMO,b.flag_closed,Case when b.LMO = 'L' then RTRIM(b.part) else 'OPERATION' end as WCWG,Case when b.LMO = 'L' then b.Units_Complete else b.Hours_Actual end as PcsCompl,b.date_Start,b.Date_due from V_JOB_HEADER a inner join V_JOB_OPERATIONS b on a.job = b.job and a.suffix = b.suffix where a.Date_closed = '1900-01-01' and b.LMO in ('O','L') and b.seq < 990000")
+	
+	f.Data.Dictionary.CreateFromSQL("DictInv","Conx","Select Part + location,Code_Sort from V_INVENTORY_ALL")
+	f.Data.Dictionary.SetDefaultReturn("DictInv","")
+	f.Data.Datatable.FillFromDictionary("DtOps","DictInv","PartLoc","CodeSort")
+	f.Data.Dictionary.Close("DictInv")
+	
+'	f.Intrinsic.Control.If(v.Caller.Switches,=,"O")
+'		
+'	f.Intrinsic.Control.EndIf
+	
+	
+	f.Data.Dictionary.CreateFromSQL("DictWOPO","Conx","Select WO + WO_SUFF + WO_SEQ,'Y' as  Status_FLG from V_PO_WO_XREF")
+	f.Data.Dictionary.SetDefaultReturn("DictWOPO","")
+	f.Data.Datatable.FillFromDictionary("DtOps","DictWOPO","JSSID","status_flag")
+	f.Data.Dictionary.Close("DictWOPO")
+	
+	f.Data.Dictionary.CreateFromSQL("DictWG","Conx","select RTRIM(Workcenter),workgroup from WORKGROUP_LINE;")
+	f.Data.Datatable.FillFromDictionary("DtOps","DictWG","WCWG")
+	f.Data.Dictionary.Close("DictWG")
+	
+	
+	f.Data.Dictionary.CreateFromSQL("DictClockin","Conx","Select Job + Suffix + Seq,'Y' as ClockedIn from V_JOBS_IN_PROCESS_G")
+	f.Data.Dictionary.SetDefaultReturn("DictClockin","N")
+	f.Data.Datatable.FillFromDictionary("DtOps","DictClockin","JSSID","ClockedIn")
+	f.Data.Dictionary.Close("DictClockin")
+	
+	f.Data.DataView.Create("DtOps","DvOps",22)
+'	f.Intrinsic.File.File2String(v.Local.sAPSFile,v.Local.sAPSFileContent)
+'	
+'	f.Intrinsic.String.Split(v.Local.sAPSFileContent,v.Ambient.NewLine,v.Local.sAPSFileContent)
+'	
+'	f.Intrinsic.Control.For(v.Local.iCount,0,v.Local.sAPSFileContent.UBound,1)
+'		
+'		f.Intrinsic.Control.If(v.Local.sAPSFileContent(v.Local.iCount).trim,=,"")
+'			f.Intrinsic.Control.GoTo(SkipLoop)
+'		f.Intrinsic.Control.EndIf
+'		f.Intrinsic.String.Mid(v.Local.sAPSFileContent(v.Local.iCount),40,4,v.Local.sWG)
+'		f.Intrinsic.String.IsInString(v.global.sWG,v.Local.sWG,True,v.Local.bExist)
+'		
+'		f.Intrinsic.Control.If(v.Local.bExist.Not)
+'			f.Intrinsic.Control.GoTo(SkipLoop)
+'		f.Intrinsic.Control.EndIf
+'		
+'		f.Intrinsic.String.Mid(v.Local.sAPSFileContent(v.Local.iCount),1,6,v.Local.sJob)
+'		f.Intrinsic.String.Mid(v.Local.sAPSFileContent(v.Local.iCount),7,3,v.Local.sSuffix)
+'		f.Intrinsic.String.Mid(v.Local.sAPSFileContent(v.Local.iCount),10,6,v.Local.sSeq)
+'		f.Intrinsic.String.Mid(v.Local.sAPSFileContent(v.Local.iCount),16,8,v.Local.sStartDate)
+'		f.Intrinsic.String.Mid(v.Local.sAPSFileContent(v.Local.iCount),24,8,v.Local.sDueDate)
+'		f.Intrinsic.String.Mid(v.Local.sAPSFileContent(v.Local.iCount),40,4,v.Local.sWG)
+'		f.Intrinsic.String.Mid(v.Local.sAPSFileContent(v.Local.iCount),44,4,v.Local.sWC)
+'		f.Intrinsic.String.Mid(v.Local.sAPSFileContent(v.Local.iCount),45,1,v.Local.sReady)
+'		
+'		f.Intrinsic.Date.ConvertDString(v.Local.sStartDate,"YYYYMMDD",v.Local.dStartDate)
+'		f.Intrinsic.Date.ConvertDString(v.Local.sDueDate,"YYYYMMDD",v.Local.dDueDate)
+'		
+'		f.Intrinsic.String.Build("{0}-{1}-{2}",v.Local.sJob,v.Local.sSuffix,v.Local.sSeq,v.Local.sJSS)
+'		
+'		
+'		f.Intrinsic.String.Build("Job = '{0}' and suffix = '{1}' and seq <= {2} and Flag_closed <> 'Y' ",v.Local.sJob,v.Local.sSuffix,v.Local.sSeq,v.Local.sFilter)
+'		
+'		f.Data.DataView.SetFilter("DtOps","DvOps",v.Local.sFilter)
+'		f.Data.DataView.SetSort("DtOps","DvOps","Seq ASC")
+'		
+'		f.Intrinsic.Control.If(v.DataView.DtOps!DvOps.RowCount,>,0)
+'			v.Local.sCurrOp.Set(v.DataView.DtOps!DvOps(0).WCWG!FieldValTrim)
+'			v.Local.sPart.Set(v.DataView.DtOps!DvOps(0).Part!FieldValTrim)
+'			v.Local.sCurrOpSeq.Set(v.DataView.DtOps!DvOps(0).Seq!FieldValTrim)
+'			v.Local.fOrderQty.Set(v.DataView.DtOps!DvOps(0).qty_order!FieldVal)
+'			v.Local.sOutPO.set(v.DataView.DtOps!DvOps(0).Status_flag!FieldValTrim)
+'			v.Local.sSort.set(v.DataView.DtOps!DvOps(0).codesort!FieldValTrim)
+'			v.Local.sDescription.set(v.DataView.DtOps!DvOps(0).Description!FieldValTrim)
+'			v.Local.sClockedIn.set(v.DataView.DtOps!DvOps(0).ClockedIn!FieldValTrim)
+'			f.Intrinsic.Control.If(v.Local.sCurrOpSeq,=,v.Local.sSeq)
+'				f.Intrinsic.Control.If(v.DataView.DtOps!DvOps(0).ClockedIn!FieldValTrim,=,0,"AND",v.DataView.DtOps!DvOps(0).ClockedIn!FieldValTrim,<>,"Y",v.Ambient.Date,>,v.Local.dStartDate)
+''					f.Intrinsic.Date.DateDiff("W",v.Ambient.Date,v.Local.dStartDate,v.Local.fIdleDays)
+'					f.Intrinsic.Date.WorkdaysBetweenDates(v.Local.dStartDate,v.Ambient.Date,v.Local.fIdleDays)
+'				f.Intrinsic.Control.Else
+'					v.Local.fIdleDays.Set(0)
+'				f.Intrinsic.Control.EndIf
+'				
+'			f.Intrinsic.Control.EndIf
+'			
+'			
+'			
+'			f.Intrinsic.Control.If(v.DataView.DtOps!DvOps.RowCount,>,1)				
+'				v.Local.sNextOp.Set(v.DataView.DtOps!DvOps(1).WCWG!FieldValTrim)
+'				
+'			f.Intrinsic.Control.Else
+'				f.Intrinsic.String.Build("Job = '{0}' and suffix = '{1}' and seq > {2} and Flag_closed <> 'Y' ",v.Local.sJob,v.Local.sSuffix,v.Local.sSeq,v.Local.sFilter)
+'				f.Data.DataView.SetFilter("DtOps","DvOps",v.Local.sFilter)
+'				f.Data.DataView.SetSort("DtOps","DvOps","Seq ASC")
+'				f.Intrinsic.Control.If(v.DataView.DtOps!DvOps.RowCount,=,0)
+'					v.Local.sNextOp.Set(FS)
+'				f.Intrinsic.Control.Else
+'					v.Local.sNextOp.Set(v.DataView.DtOps!DvOps(0).WCWG!FieldValTrim)
+'				f.Intrinsic.Control.EndIf
+'			f.Intrinsic.Control.EndIf
+'			
+'			
+'			f.Intrinsic.String.Build("Job = '{0}' and suffix = '{1}' and seq < {2}",v.Local.sJob,v.Local.sSuffix,v.Local.sSeq,v.Local.sFilter)
+'			f.Data.DataView.SetFilter("DtOps","DvOps",v.Local.sFilter)
+'			f.Data.DataView.SetSort("DtOps","DvOps","Seq Desc")
+'			
+'			f.Intrinsic.Control.If(v.DataView.DtOps!DvOps.RowCount,>,0)
+'				v.Local.fClaimedPcs.Set(v.DataView.DtOps!DvOps(0).PcsCompl!FieldVal)
+'			f.Intrinsic.Control.Else
+'				v.Local.fClaimedPcs.Set(v.Local.fOrderQty)
+'			f.Intrinsic.Control.EndIf
+'			
+'			f.Intrinsic.math.Sub(v.Local.fOrderQty,v.Local.fClaimedPcs,v.Local.iCompare)
+'			
+'			f.Data.Datatable.AddRow("DtTrueView","JSS",v.Local.sJSS,"SORT",v.Local.sSort,"Part",v.Local.sPart,"Description",V.Local.sDescription,"DueDate",v.Local.dDueDate,"StartDate",v.Local.dStartDate,"OrdQty",v.Local.fOrderQty,"QtyClaimed",v.Local.fqtyClaimed,"IdleDays",v.Local.fIdleDays,"CurrOp",v.Local.sCurrOp,"NextOp",v.Local.sNextOp,"WG",v.Local.sWG,"ClockedIn",v.Local.sClockedIn,"OutPO",v.Local.sOutPO,"Compare",v.Local.iCompare)
+'		f.Intrinsic.Control.EndIf
+'		f.Intrinsic.Control.Label("SkipLoop")
+'	f.Intrinsic.Control.Next(v.Local.iCount)
+	
+	'loop for outside sq as a seperate WG
+	
+	f.Data.dataview.SetFilter("DtOps","DvOps","FLAG_CLOSED <> 'Y' and STATUS_FLAG <> 'Y' and (WCWG = 'OPERATION' or WCWG = 'QCIG') ")
+	f.Data.DataView.SetSort("DtOps","DvOps","Date_Start asc")
+	
+	f.Data.DataView.ToDataTable("DtOps","DvOps","DtOutOps",true)
+	
+	f.Intrinsic.Control.for(v.Local.iCount,0,v.DataTable.DtOutOps.RowCount--,1)
+		v.Local.sJob.Set(v.DataTable.DtOutOps(v.Local.iCount).Job!fieldValTrim)
+		v.Local.sSuffix.Set(v.DataTable.DtOutOps(v.Local.iCount).suffix!fieldValTrim)
+		v.Local.sSeq.Set(v.DataTable.DtOutOps(v.Local.iCount).Seq!fieldValTrim)
+		v.Local.dStartDate.Set(v.DataTable.DtOutOps(v.Local.iCount).Date_Start!fieldValTrim)
+		v.Local.dDueDate.Set(v.DataTable.DtOutOps(v.Local.iCount).Date_due!fieldValTrim)
+		v.Local.sClockedIn.Set(v.DataTable.DtOutOps(v.Local.iCount).ClockedIn!FieldValTrim)
+		
+		f.Intrinsic.Control.If(v.DataTable.DtOutOps(v.Local.iCount).Parent_Date_due!fieldValTrim,=,"")
+			v.Local.dPromiseDate.Set(v.DataTable.DtOutOps(v.Local.iCount).HDateDue!fieldValTrim)
+		f.Intrinsic.Control.Else
+			v.Local.dPromiseDate.Set(v.DataTable.DtOutOps(v.Local.iCount).Parent_Date_due!fieldValTrim)
+		f.Intrinsic.Control.EndIf
+		
+		
+		f.Intrinsic.Control.If(v.DataTable.DtOutOps(v.Local.iCount).LMO!fieldValTrim,=,"O")
+			v.Local.sWG.Set("ZOUT")
+			
+		f.Intrinsic.Control.Else
+		 
+			v.Local.sWG.Set(v.DataTable.DtOutOps(v.Local.iCount).WCWG!fieldValTrim)
+		
+		f.Intrinsic.Control.EndIf
+		
+		
+		
+		f.Intrinsic.String.Build("{0}-{1}-{2}",v.Local.sJob,v.Local.sSuffix,v.Local.sSeq,v.Local.sJSS)
+		
+		
+		f.Intrinsic.String.Build("Job = '{0}' and suffix = '{1}' and seq <= {2} and Flag_closed <> 'Y' ",v.Local.sJob,v.Local.sSuffix,v.Local.sSeq,v.Local.sFilter)
+		
+		f.Data.DataView.SetFilter("DtOps","DvOps",v.Local.sFilter)
+		f.Data.DataView.SetSort("DtOps","DvOps","Seq ASC")
+		
+		f.Intrinsic.Control.If(v.DataView.DtOps!DvOps.RowCount,>,0)
+			v.Local.sCurrOp.Set(v.DataView.DtOps!DvOps(0).WCWG!FieldValTrim)
+			v.Local.sCWC.Set(v.DataView.DtOps!DvOps(0).WC!FieldValTrim)
+			v.Local.sPart.Set(v.DataView.DtOps!DvOps(0).Part!FieldValTrim)
+			v.Local.sCurrOpSeq.Set(v.DataView.DtOps!DvOps(0).Seq!FieldValTrim)
+			v.Local.fOrderQty.Set(v.DataView.DtOps!DvOps(0).qty_order!FieldVal)
+			v.Local.sOutPO.set(v.DataView.DtOps!DvOps(0).Status_flag!FieldValTrim)
+			v.Local.sSort.set(v.DataView.DtOps!DvOps(0).codesort!FieldValTrim)
+			v.Local.sDescription.set(v.DataView.DtOps!DvOps(0).Description!FieldValTrim)
+			
+			v.Local.fqtyClaimed.Set(v.DataView.DtOps!DvOps(0).PcsCompl!FieldValTrim)
+			
+			'next open sequence would obviously be the next Op in relation to the etire job
+			f.Intrinsic.Control.If(v.DataView.DtOps!DvOps.RowCount,>,1)				
+				v.Local.sNextOp.Set(v.DataView.DtOps!DvOps(1).WCWG!FieldValTrim)
+				v.Local.sNWC.Set(v.DataView.DtOps!DvOps(1).WC!FieldValTrim)
+			'if it is on the current seq then the next op would need to take the next available sequence.	
+			f.Intrinsic.Control.Else
+				f.Intrinsic.String.Build("Job = '{0}' and suffix = '{1}' and seq > {2}",v.Local.sJob,v.Local.sSuffix,v.Local.sSeq,v.Local.sFilter)
+				f.Data.DataView.SetFilter("DtOps","DvOps",v.Local.sFilter)
+				f.Data.DataView.SetSort("DtOps","DvOps","Seq ASC")
+				f.Intrinsic.Control.If(v.DataView.DtOps!DvOps.RowCount,=,0)
+					v.Local.sNextOp.Set(FS)
+					v.Local.sNWC.Set("")
+				f.Intrinsic.Control.Else
+					v.Local.sNextOp.Set(v.DataView.DtOps!DvOps(0).WCWG!FieldValTrim)
+					v.Local.sNWC.Set(v.DataView.DtOps!DvOps(0).WC!FieldValTrim)
+				f.Intrinsic.Control.EndIf
+			f.Intrinsic.Control.EndIf
+			
+			
+			
+			f.Intrinsic.String.Build("Job = '{0}' and suffix = '{1}' and seq < {2}",v.Local.sJob,v.Local.sSuffix,v.Local.sSeq,v.Local.sFilter)
+			f.Data.DataView.SetFilter("DtOps","DvOps",v.Local.sFilter)
+			f.Data.DataView.SetSort("DtOps","DvOps","Seq Desc")
+			
+			f.Intrinsic.Control.If(v.DataView.DtOps!DvOps.RowCount,>,0)
+				v.Local.fClaimedPcs.Set(v.DataView.DtOps!DvOps(0).PcsCompl!FieldVal)
+				'idle days is calculate if the last sequence is closed and no activity in current sequence. it is the ambient date - date when last sequence was closed.
+				f.Intrinsic.Control.If(v.Local.sCurrOpSeq,=,v.Local.sSeq)
+					f.Intrinsic.Control.If(v.Local.sClockedIn,<>,"Y","AND",v.local.fQtyClaimed,=,0)		
+						v.Local.dlastSeqClose.Set(v.DataView.Dtops!DvOps(0).Date_Completed!fieldValTrim)
+						f.Intrinsic.Date.WorkdaysBetweenDates(v.Local.dlastSeqClose,v.Ambient.Date,v.Local.fIdleDays)
+					f.Intrinsic.Control.Else
+						v.Local.fIdleDays.Set(0)
+					f.Intrinsic.Control.EndIf
+				f.Intrinsic.Control.Else
+					v.Local.fIdleDays.Set(0)
+				f.Intrinsic.Control.EndIf
+			f.Intrinsic.Control.Else
+				v.Local.fClaimedPcs.Set(v.Local.fqtyClaimed)
+				v.Local.fIdleDays.Set(0)
+			f.Intrinsic.Control.EndIf
+			
+			f.Intrinsic.math.Sub(v.Local.fOrderQty,v.Local.fClaimedPcs,v.Local.iCompare)
+			f.Intrinsic.Control.If(v.Local.sWG,=,"ZOUT")
+				f.Intrinsic.Control.If(v.Local.sCurrOp.Trim,=,"OPERATION","OR",v.Local.sNextOp.Trim,=,"OPERATION")
+					f.Data.Datatable.AddRow("DtTrueView","JSS",v.Local.sJSS,"SORT",v.Local.sSort,"Part",v.Local.sPart,"Description",V.Local.sDescription,"DueDate",v.Local.dDueDate,"StartDate",v.Local.dStartDate,"OrdQty",v.Local.fOrderQty,"QtyClaimed",v.Local.fClaimedPcs,"IdleDays",v.Local.fIdleDays,"CurrOp",v.Local.sCurrOp,"NextOp",v.Local.sNextOp,"WG",v.Local.sWG,"ClockedIn",v.Local.sClockedIn,"OutPO",v.Local.sOutPO,"Compare",v.Local.iCompare,"ParentDueDate",v.Local.dPromiseDate,"CWC",v.Local.sCWC,"NWC",v.Local.sNWC)
+				f.Intrinsic.Control.EndIf
+			f.Intrinsic.Control.ElseIf(v.Local.sWG,=,"QCIG")
+				f.Intrinsic.Control.If(v.Local.sCurrOp.Trim,=,"QCIG","OR",v.Local.sNextOp.Trim,=,"QCIG")
+					f.Data.Datatable.AddRow("DtTrueView","JSS",v.Local.sJSS,"SORT",v.Local.sSort,"Part",v.Local.sPart,"Description",V.Local.sDescription,"DueDate",v.Local.dDueDate,"StartDate",v.Local.dStartDate,"OrdQty",v.Local.fOrderQty,"QtyClaimed",v.Local.fClaimedPcs,"IdleDays",v.Local.fIdleDays,"CurrOp",v.Local.sCurrOp,"NextOp",v.Local.sNextOp,"WG",v.Local.sWG,"ClockedIn",v.Local.sClockedIn,"OutPO",v.Local.sOutPO,"Compare",v.Local.iCompare,"ParentDueDate",v.Local.dPromiseDate,"CWC",v.Local.sCWC,"NWC",v.Local.sNWC)
+				f.Intrinsic.Control.EndIf
+			
+			f.Intrinsic.Control.EndIf
+			
+			
+			
+		f.Intrinsic.Control.EndIf
+	f.Intrinsic.Control.Next(v.Local.iCount)
+			
+	f.Intrinsic.Control.CallSub("format_class","WG","ZOUT")
+	f.Intrinsic.Control.CallSub("format_class","WG","QCIG")
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}GAB Version: {5}}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+'	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Debug.SetLA(v.Local.sError)
+	f.Intrinsic.Control.CallSub("Unload")
+F.Intrinsic.Control.EndTry
+Program.Sub.LoadData.End
+
+
+Program.Sub.format_class.Start
+v.Local.sError.Declare
+f.Intrinsic.Control.Try
+	v.Local.sFilter.Declare
+	v.Local.sTitle.Declare
+	V.Local.sWorkGroup.Declare
+	
+	f.Intrinsic.String.Build("WG = '{0}'",v.args.WG,v.Local.sFilter)
+	
+	f.Intrinsic.Control.If(v.Args.wg,=,"ZOUT")
+		f.Data.Datatable.AddExpressionColumn("DtTrueView","SORT2","long","IIF(CurrOp = 'OPERATION',1,IIF(nextOp = 'OPERATION',2,3))")
+	f.Intrinsic.Control.Elseif(v.Args.wg,=,"QCIG")
+		f.Data.Datatable.AddExpressionColumn("DtTrueView","SORT2","long","IIF(CurrOp = 'QCIG',1,IIF(nextOp = 'QCIG',2,3))")
+	f.Intrinsic.Control.EndIf
+	
+	
+	
+	
+	
+	f.Data.DataView.Create("DtTrueView","DvTrueView",22,v.Local.sFilter,"Sort2,StartDate ASC")
+	
+	f.Data.Dataview.ToDataTable("DtTrueView","DvTrueView","DtTemp0")
+	
+	f.Data.Datatable.RemoveColumn("DtTrueView","SORT2")
+	
+	f.Data.DataView.Close("DtTrueView","DvTrueView")
+	
+	'add HTML syntaxed data column
+'	f.Data.DataTable.AddExpressionColumn("OrderHd","DtTemp0","String","IIF(substring(part,1,6) = 'PIC-LB' or substring(part,1,5) = 'SVC-P' , '<td class=brown-cells>' + part, IIF(substring(part,1,5) = 'PICHJ', '<td class=black-cells>' + part,  IIF(substring(PART,1,3) = 'LBF' or substring(PART,1,5) = 'SVC-F' , '<td class=gray-cells>' + part, '<td class=yellow-cells>' + part)))")
+
+	
+	f.Data.DataTable.AddExpressionColumn("DtTemp0","Job-Suffix-Seq","String","IIF(ClockedIn = 'Y' , '<td_class=green-cell>' + JSS,JSS)")
+	f.Data.DataTable.AddExpressionColumn("DtTemp0","Qty_Claimed","String","IIF((OrdQty - QtyClaimed) > 0 , '<td_class=fred-cell>' + Qtyclaimed,'<td_class=fblue-cell>' + Qtyclaimed)")
+	f.Data.DataTable.AddExpressionColumn("DtTemp0","Due_date","String","IIF(ParentDueDate < duedate, '<td_class=fred-cell>' + DueDate,DueDate)")
+
+	
+	f.Data.DataTable.AddExpressionColumn("DtTemp0","Curr_Op","String","IIF(Currop = 'QCIG',CurrOp + CWC,CurrOp)")
+	f.Data.DataTable.AddExpressionColumn("DtTemp0","Next_Op","String","IIF(NextOp = 'QCIG',NextOp + NWC,NextOp)")
+	
+	f.Data.DataTable.Create("Temp",True)
+	f.Data.Datatable.AddColumn("Temp","Job-Suffix-Seq","String")
+	f.Data.Datatable.AddColumn("Temp","SORT","String")
+	f.Data.Datatable.AddColumn("Temp","Part","String")
+	f.Data.Datatable.AddColumn("Temp","Description","String")
+	f.Data.Datatable.AddColumn("Temp","StartDate","String")
+	f.Data.Datatable.AddColumn("Temp","Due_Date","String")
+	f.Intrinsic.Control.If(v.args.WG,=,"ZOUT")
+		f.Data.Datatable.AddColumn("Temp","ParentDueDate","String")
+	f.Intrinsic.Control.EndIf
+	f.Data.Datatable.AddColumn("Temp","OrdQty","String")
+	f.Data.Datatable.AddColumn("Temp","Qty_Claimed","String")
+	f.Data.Datatable.AddColumn("Temp","IdleDays","String")
+	f.Data.Datatable.AddColumn("Temp","Curr_Op","String")
+	f.Data.Datatable.AddColumn("Temp","Next_Op","String")
+
+	
+	
+	
+	f.Data.Datatable.Merge("DtTemp0","Temp",True,2)
+
+	
+	f.Intrinsic.Control.CallSub("GenerateHTML","sWG",v.Args.WG)
+	
+	f.Data.Datatable.Close("Temp")
+	
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}GAB Version: {5}}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+'	F.Intrinsic.UI.Msgbox(V.Local.sError)	
+	f.Intrinsic.Debug.SetLA(v.Local.sError)
+	f.Intrinsic.Control.CallSub("Unload")
+F.Intrinsic.Control.EndTry	
+
+Program.Sub.format_class.End
+
+Program.Sub.GenerateHTML.Start
+v.Local.sError.Declare
+f.Intrinsic.Control.Try
+	v.Local.sFilter.Declare
+	v.Local.sFile.Declare
+	v.Local.sData.Declare
+	v.Local.sHTML.Declare
+	v.Local.sDir.Declare
+	v.Local.sColumns.Declare
+	v.Local.iColumns.Declare
+	v.Local.sLineSplit.Declare
+	v.Local.sTable.Declare
+	v.Local.sRowStart.Declare
+	v.Local.sRowEnd.Declare
+	v.Local.sTableStart.Declare
+	v.Local.sTableEnd.Declare
+	v.Local.iCRow.Declare
+	v.Local.iCCell.Declare
+	v.Local.STitle.Declare
+	v.Local.iRefresh.Declare
+	
+	f.Intrinsic.String.Build("<tr>{0}{1}<td class="Empty">&nbsp;</td>",v.Ambient.NewLine,v.Ambient.Tab,v.Local.sRowStart)
+	f.Intrinsic.String.Build("</td>{0}<td class="Last">&nbsp;</td>{0}</tr>",v.Ambient.NewLine,v.Local.sRowEnd)
+	
+	'load the template file
+	f.Intrinsic.String.Build("{0}\GCG_6350_TEMPLATE.html",V.Global.sFolder,V.Local.sFile)
+	F.Intrinsic.File.File2String(V.Local.sFile,V.Local.sHTML)
+	f.Intrinsic.Control.If(v.Args.sWG,=,"ZOUT")
+		v.Local.STitle.Set("Trueview for Outside Services(Shipping)")
+	f.Intrinsic.Control.Else
+		v.Local.STitle.Set("Trueview for Quality")
+	f.Intrinsic.Control.EndIf
+'	f.Intrinsic.String.Build("OCI, Outside and Shipping TrueView: {0}",V.Args.sWG,V.Local.sTitle)
+	
+	'inject the title in to the HTML page
+	F.Intrinsic.String.Replace(V.Local.sHTML,"#PAGETITLE#",V.Local.sTitle,V.Local.sHTML)
+	
+'	f.Intrinsic.String.Build("WG = '{0}'",v.args.WG,v.Local.sFilter)
+'	
+'	f.Data.DataView.Create("DtTrueView","DvTrueView",22,v.Local.sFilter,"StartDate ASC")
+'	
+'	f.Data.Dataview.ToDataTable("DtTrueView","DvTrueView","DtTemp")
+'	
+'	f.Data.DataView.Close("DtTrueView","DvTrueView")
+'	
+'	f.Data.Datatable.RemoveColumn("DtTemp","WG")
+'	f.Data.Datatable.RemoveColumn("DtTemp","ClockedIn")
+'	f.Data.Datatable.RemoveColumn("DtTemp","Compare")
+	
+	'get the column count  #COLUMNCOUNT#
+	f.Intrinsic.String.Split(v.DataTable.Temp.FieldNames,"*!*",v.Local.sColumns)
+	f.Intrinsic.Math.Add(v.Local.sColumns.UBound,1,v.Local.iColumns)
+	f.Intrinsic.String.Replace(v.Local.sHTML,"#COLUMNCOUNT#",V.Local.iColumns,V.Local.sHTML)
+	
+	'add additional rows if the row count exceeds 35
+	f.Intrinsic.Control.If(v.DataTable.Temp.RowCount,>,25)
+		'f.Intrinsic.Math.Add(v.Local.iColumns,2,v.Local.iColumns)
+		f.Intrinsic.Control.For(v.Local.iCRow,0,5,1)
+			f.Intrinsic.String.Build("{0}<tr>",v.Local.sTableStart,v.Local.sTableStart)
+			f.Intrinsic.Control.For(v.Local.iCCell,1,v.Local.iColumns,1)
+				f.Intrinsic.String.Build("{0}{1}<td class="data-cell">&nbsp;</td>",v.Local.sTableStart,v.Ambient.NewLine,v.Local.sTableStart)
+			f.Intrinsic.Control.Next(v.Local.icCell)
+			f.Intrinsic.String.Build("{0}{1}</tr>{1}",v.Local.sTableStart,v.Ambient.NewLine,v.Local.sTableStart)
+		f.Intrinsic.Control.Next(v.Local.iCRow)
+		v.Local.sTableEnd.set(v.Local.sTableStart)
+	f.Intrinsic.Control.Else
+		v.Local.sTableStart.Set("")
+		v.Local.sTableEnd.Set("")
+	f.Intrinsic.Control.EndIf
+	
+	'create the headers  #COLUMNHEADERS#
+	f.Intrinsic.String.Build("</td>{0}{1}<td class="data-cell">",v.Ambient.NewLine,v.Ambient.Tab,v.Local.sLineSplit)
+	'f.Intrinsic.String.Build("{3}{0}{2}<td class="data-cell">{1}{4}",v.Ambient.NewLine,v.DataTable.[V.LOCAL.STABLE].FieldNames,v.Ambient.Tab,v.Local.sRowStart,v.Local.sRowEnd,V.Local.sColumns)
+	f.Intrinsic.String.Build("{2}<td class="data-cell">{0}{1}",v.DataTable.Temp.FieldNames,"</td>",v.Ambient.Tab,V.Local.sColumns)
+	f.Intrinsic.String.Replace(v.Local.sColumns,"*!*",v.Local.sLineSplit,v.Local.sColumns)
+	F.Intrinsic.String.Replace(V.Local.sColumns,"_"," ",V.Local.sColumns)
+	
+	f.Intrinsic.String.Build("{1}<td class="Last">&nbsp;</td>{0}</tr>",v.Ambient.NewLine,v.Ambient.Tab,v.Local.sRowEnd)
+	
+	'create the body table  #MAINDATA#
+	f.Data.DataTable.ExportHTML("Temp",V.DataTable.Temp.FieldNames,,,True,v.Local.sData)
+	f.Intrinsic.String.Replace(v.Local.sData,"<td>&nbsp;</td>","<td class="data-cell"></td>",v.Local.sData)
+	'F.Intrinsic.String.Replace(V.Local.sData,"<tr>",V.Local.sRowStart,V.Local.sData)
+	'F.Intrinsic.String.Replace(V.Local.sData,"</tr>",v.Local.sRowEnd,v.Local.sData)
+	f.Intrinsic.String.Replace(v.Local.sData,"td_class=green-cell","td_class="green-cell"",v.Local.sData)
+	f.Intrinsic.String.Replace(v.Local.sData,"td_class=fred-cell","td_class="fred-cell"",v.Local.sData)
+	f.Intrinsic.String.Replace(v.Local.sData,"td_class=fblue-cell","td_class="fblue-cell"",v.Local.sData)
+	f.Intrinsic.String.Replace(v.Local.sData,"></td>",">&nbsp;</td>",v.Local.sData)
+	f.Intrinsic.String.Replace(v.Local.sData,"<td><td_class","<td class",v.Local.sData)
+	f.Intrinsic.String.Replace(v.Local.sData,"<td><td","<td>",v.Local.sData)
+	f.Intrinsic.String.Replace(v.Local.sData,"12:00:00 AM","",v.Local.sData)
+	f.Intrinsic.String.Replace(v.Local.sData,":00 A"," A",v.Local.sData)
+	f.Intrinsic.String.Replace(v.Local.sData,":00 P"," P",v.Local.sData)
+	f.Intrinsic.String.Replace(v.Local.sData,"<table>",v.Local.sTableStart,v.Local.sData)
+	f.Intrinsic.String.Replace(v.Local.sData,"</table>",v.Local.sTableEnd,v.Local.sData)
+	
+	'inject the column headers
+	f.Intrinsic.String.Replace(v.Local.sHTML,"#COLUMNHEADERS#",V.Local.sColumns,V.Local.sHTML)
+	
+	'inject the main table in to the HTML page
+	f.Intrinsic.String.Replace(v.Local.sHTML,"#MAINDATA#",V.Local.sData,V.Local.sHTML)
+	
+	'inject the refresh rate
+	f.Intrinsic.Math.Mult(v.Global.iRefresh,1000,v.Local.iRefresh)
+	f.Intrinsic.String.Replace(v.Local.sHTML,"#SLEEP#",V.local.iRefresh,V.Local.sHTML)
+	
+	f.Intrinsic.String.Replace(v.Local.sHTML,"#LASTUPDATE#",v.Ambient.Now,V.Local.sHTML)
+	
+	f.Intrinsic.String.Replace(v.Local.sFile,"GCG_6350_TEMPLATE.HTML","GCG_6350",V.Local.sFile)
+	F.Intrinsic.String.Build("{0}_{1}_{2}.HTML",V.Local.sFile,V.Args.sWG,V.Caller.CompanyCode,V.Local.sFile)
+	F.Intrinsic.File.String2File(V.Local.sFile,V.Local.sHTML)
+	
+	F.Intrinsic.Control.If(V.Caller.Switches,=,"O")
+		F.Intrinsic.Task.ShellExec(0,"OPEN",V.Local.sFile,"","",0)
+	F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}GAB Version: {5}}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+'	F.Intrinsic.UI.Msgbox(V.Local.sError)	
+	f.Intrinsic.Debug.SetLA(v.Local.sError)
+	f.Intrinsic.Control.CallSub("Unload")
+F.Intrinsic.Control.EndTry
+
+
+
+Program.Sub.GenerateHTML.End
+
+Program.Sub.CommonDatatables.Start
+
+f.Data.DataTable.Create("Temp",True)
+f.Data.Datatable.AddColumn("Temp","Job-Suffix-Seq","String")
+f.Data.Datatable.AddColumn("Temp","SORT","String")
+f.Data.Datatable.AddColumn("Temp","Part","String")
+f.Data.Datatable.AddColumn("Temp","Description","String")
+f.Data.Datatable.AddColumn("Temp","StartDate","String")
+f.Data.Datatable.AddColumn("Temp","Due_Date","String")
+f.Data.Datatable.AddColumn("Temp","OrdQty","String")
+f.Data.Datatable.AddColumn("Temp","Qty_Claimed","String")
+f.Data.Datatable.AddColumn("Temp","IdleDays","String")
+f.Data.Datatable.AddColumn("Temp","CurrOp","String")
+f.Data.Datatable.AddColumn("Temp","NextOp","String")
+
+f.Data.DataTable.Create("CLASS",True)
+f.Data.DataTable.AddColumn("CLASS","PROJECT","STRING")
+F.Data.DataTable.AddColumn("CLASS","DATA","STRING")
+F.Data.DataTable.AddColumn("CLASS","RED","STRING")
+F.Data.DataTable.AddColumn("CLASS","GREEN","STRING")
+F.Data.DataTable.AddColumn("CLASS","ORANGE","STRING")
+F.Data.DataTable.AddColumn("CLASS","YELLOW","STRING")
+F.Data.DataTable.AddColumn("CLASS","MIST","STRING")
+F.Data.DataTable.AddColumn("CLASS","BLUE","STRING")
+F.Data.DataTable.AddColumn("CLASS","GRAY","STRING")
+F.Data.DataTable.AddColumn("CLASS","CYAN","STRING")
+F.Data.DataTable.AddColumn("CLASS","MAGENTA","STRING")
+F.Data.DataTable.AddColumn("CLASS","DATE","DATE",V.Ambient.Date)
+
+F.Data.DataTable.AddRow("CLASS","DATA","<td class="data-cell">","RED","<td class="red-cell">","GREEN","<td class="green-cell">","ORANGE","<td class="orange-cell">","YELLOW","<td class="yellow-cell">","MIST","<td class="mist-cell">","BLUE","<td class="blue-cell">","GRAY","<td class="gray-cell">","CYAN","<td class="cyan-cell">","MAGENTA","<td class="magenta-cell">")
+
+Program.Sub.CommonDatatables.End
+
+Program.Sub.Comments.Start
+${$5$}$3.0.0.0$}$1
+${$6$}$adsouza$}$20210817151609443$}$JX3L09Cgehg7O+lKYSb2ur8FFsJUp9u/UR871R+yN/4VCDBfT8ES64ymQQ5h4O0/R+qlMymrSjs=
+Program.Sub.Comments.End
