@@ -1,0 +1,250 @@
+﻿Program.Sub.ScreenSU.Start
+Gui.FMaint..Create(BaseForm)
+Gui.FMaint..Caption("TrueView Maintenance")
+Gui.FMaint..Size(507,115)
+Gui.FMaint..MinX(0)
+Gui.FMaint..MinY(0)
+Gui.FMaint..Position(0,0)
+Gui.FMaint..AlwaysOnTop(False)
+Gui.FMaint..FontName("Tahoma")
+Gui.FMaint..FontSize(8.25)
+Gui.FMaint..ControlBox(True)
+Gui.FMaint..MaxButton(False)
+Gui.FMaint..MinButton(True)
+Gui.FMaint..MousePointer(0)
+Gui.FMaint..Moveable(True)
+Gui.FMaint..Sizeable(False)
+Gui.FMaint..ShowInTaskBar(True)
+Gui.FMaint..TitleBar(True)
+Gui.FMaint..Event(UnLoad,FMaint_UnLoad)
+Gui.FMaint.cmdSave.Create(Button)
+Gui.FMaint.cmdSave.Enabled(True)
+Gui.FMaint.cmdSave.Visible(True)
+Gui.FMaint.cmdSave.Zorder(0)
+Gui.FMaint.cmdSave.Size(75,23)
+Gui.FMaint.cmdSave.Position(5,56)
+Gui.FMaint.cmdSave.Caption("Save")
+Gui.FMaint.cmdSave.FontName("Tahoma")
+Gui.FMaint.cmdSave.FontSize(8.25)
+Gui.FMaint.cmdSave.Event(Click,cmdSave_Click)
+Gui.FMaint.lbl1.Create(Label,"Logo(280px X 85px):",True,101,13,0,6,8,True,0,"Tahoma",8.25,,0,0)
+Gui.FMaint.lbl1.BorderStyle(0)
+Gui.FMaint.txtLogo.Create(TextBox,"",True,368,20,0,109,4,True,0,"Tahoma",8.25,,1)
+Gui.FMaint.txtLogo.Locked(True)
+Gui.FMaint.cmdLogoBrow.Create(Button)
+Gui.FMaint.cmdLogoBrow.Enabled(True)
+Gui.FMaint.cmdLogoBrow.Visible(True)
+Gui.FMaint.cmdLogoBrow.Zorder(0)
+Gui.FMaint.cmdLogoBrow.Size(21,20)
+Gui.FMaint.cmdLogoBrow.Position(482,4)
+Gui.FMaint.cmdLogoBrow.Caption("^")
+Gui.FMaint.cmdLogoBrow.FontName("Tahoma")
+Gui.FMaint.cmdLogoBrow.FontSize(8.25)
+Gui.FMaint.cmdLogoBrow.Event(Click,cmdLogoBrow_Click)
+Gui.FMaint.lbl2.Create(Label,"HTML Refresh(Sec): ",True,99,13,0,6,34,True,0,"Tahoma",8.25,,0,0)
+Gui.FMaint.lbl2.BorderStyle(0)
+Gui.FMaint.txtRefresh.Create(TextBox,"120",True,54,20,0,109,30,True,0,"Tahoma",8.25,,1)
+Gui.FMaint.txtRefresh.NumericOnly(2)
+Gui.FMaint.txtRefresh.DefaultValue("120")
+Gui.FMaint.txtCutoff.Create(TextBox,"",True,27,20,0,249,30,True,0,"Tahoma",8.25,,1)
+Gui.FMaint.txtCutoff.NumericOnly(2)
+Gui.FMaint.txtCutoff.DefaultValue("0")
+Gui.FMaint.lbl3.Create(Label,"Cutoff Days:",True,62,13,0,179,34,True,0,"Tahoma",8.25,,0,0)
+Gui.FMaint.lbl3.BorderStyle(0)
+Gui.FMaint.lbl3.ToolTip("Days added to todays date to be included when brining in based on scheduled date")
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+v.Global.sFolder.Declare
+V.Global.sFQPLogo.Declare
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+Function.Intrinsic.UI.UsePixels ' Allows you to use Pixels instead of Twips throughout
+
+f.Intrinsic.Control.CallSub(FolderCheck)
+f.Intrinsic.Control.CallSub(Extract)
+f.Intrinsic.Control.CallSub(LoadData)
+gui.FMaint..Show
+
+Program.Sub.Main.End
+Program.Sub.cmdLogoBrow_Click.Start
+'Browse for logo that will be used for HTML Page. ".png" 280px X 85px
+V.Local.sRet.Declare(String)
+
+'only .png files allowed
+F.Intrinsic.UI.ShowOpenFileDialog("","jpg|*.jpg","",V.Local.sRet)
+F.Intrinsic.Control.If(V.Local.sRet,<>,"***CANCEL***")
+	V.Global.sFQPLogo.Set(V.Local.sRet)
+	F.Intrinsic.File.GetFileNameFromFQN(V.Local.sRet,V.Local.sRet)
+	Gui.FMaint.txtLogo.Text(V.Local.sRet)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ExitSub
+Program.Sub.cmdLogoBrow_Click.End
+
+Program.Sub.FMaint_UnLoad.Start
+V.Local.sError.Declare
+v.Local.sDescription.Declare
+v.Local.sSQL.Declare
+
+f.Intrinsic.Control.If(v.ODBC.conx.State,=,1)
+	F.ODBC.Connection!conX.close
+f.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.End
+Program.Sub.FMaint_UnLoad.End
+Program.Sub.cmdSave_Click.Start
+v.Local.iRow.declare
+v.Local.iSleep.Declare
+v.Local.icutoff.Declare
+v.Local.sSql.Declare
+
+gui.FMaint..Enabled(false)
+f.ODBC.Connection!conx.ExecuteAndReturn("Select Count(*) from GCG_6350_HTML_CONFIG ",v.Local.iRow)
+
+v.Local.iSleep.Set(v.Screen.FMaint!txtRefresh.Text)
+v.Local.icutoff.Set(v.Screen.FMaint!txtCutoff.Text)
+
+f.Intrinsic.Control.If(v.Local.iRow,=,0)
+	f.Intrinsic.String.Build("insert into GCG_6350_HTML_CONFIG (LOGO,REFRESH_RATE,CUTOFF) values ('{0}','{1}', '{2}')",v.Global.sFQPLogo,v.Local.iSleep,v.Local.icutoff,v.Local.sSql)
+f.Intrinsic.Control.Else
+	f.Intrinsic.String.Build("Update GCG_6350_HTML_CONFIG set Logo = '{0}', Refresh_rate = '{1}', Cutoff = '{2}'",v.Global.sFQPLogo,v.Local.iSleep,v.Local.icutoff,v.Local.sSql)
+f.Intrinsic.Control.EndIf
+
+f.ODBC.Connection!conx.Execute(v.Local.sSql)
+
+'v.Local.iSleep.Set(v.Screen.FMaint!txtRefresh.Text)
+'f.ODBC.Connection!conx.ExecuteAndReturn("Select Count(*) from GCG_6350_HTML_CONFIG where Line_type = 'R'",v.Local.iRow)
+
+'f.Intrinsic.Control.If(v.Local.iRow,=,0)
+'	f.Intrinsic.String.Build("insert into GCG_6350_HTML_CONFIG (REFRESH_RATE,LINE_TYPE) values ('{0}','R')",v.Local.iSleep,v.Local.sSql)
+'f.Intrinsic.Control.Else
+'	f.Intrinsic.String.Build("Update GCG_6350_HTML_CONFIG set REFRESH_RATE = '{0}' where LINE_TYPE = 'R'",v.Local.iSleep,v.Local.sSql)
+'f.Intrinsic.Control.EndIf
+'f.ODBC.Connection!conx.Execute(v.Local.sSql)
+
+'f.Data.Datatable.SaveToDB("WgDT","Conx","GCG_6350_HTML_CONFIG","WORK_GROUP",256,"WORK_GROUP@!@WORK_GROUP*!*ENABLED@!@ENABLED*!*LINE_TYPE@!@LINE_TYPE")
+gui.FMaint..Enabled(True)
+gui.FMaint..Show(True)
+Program.Sub.cmdSave_Click.End
+
+Program.Sub.FolderCheck.Start
+v.Local.bEx.Declare
+f.Intrinsic.String.Build("{0}\CUSTOM",v.Caller.GlobalDir,v.Global.sFolder)
+f.Intrinsic.File.DirExists(v.Global.sFolder,v.Local.bEx)
+f.Intrinsic.Control.If(v.Local.bEx.Not)
+	f.Intrinsic.File.CreateDir(v.Global.sFolder)
+f.Intrinsic.Control.EndIf
+
+f.Intrinsic.String.Build("{0}\6350",v.Global.sFolder,v.Global.sFolder)
+f.Intrinsic.File.DirExists(v.Global.sFolder,v.Local.bEx)
+f.Intrinsic.Control.If(v.Local.bEx.Not)
+	f.Intrinsic.File.CreateDir(v.Global.sFolder)
+f.Intrinsic.Control.EndIf
+
+f.Intrinsic.String.Build("{0}\{1}",v.Global.sFolder,v.Caller.CompanyCode,v.Global.sFolder)
+f.Intrinsic.File.DirExists(v.Global.sFolder,v.Local.bEx)
+f.Intrinsic.Control.If(v.Local.bEx.Not)
+	f.Intrinsic.File.CreateDir(v.Global.sFolder)
+f.Intrinsic.Control.EndIf
+
+Program.Sub.FolderCheck.End
+
+Program.Sub.Extract.Start
+v.Local.bExist.Declare(Boolean)
+v.Local.sRet.Declare(String)
+v.Local.sDir.Declare(String)
+
+F.Intrinsic.String.Build("{0}\GCG_6350_TEMPLATE.html",v.Global.sFolder,V.Local.sDir)
+f.Intrinsic.File.Exists(v.Local.sDir,v.Local.bExist)
+f.Intrinsic.Control.If(v.Local.bExist.Not,=,True)
+	'base HTML files doesn't exit so we need to unzip it
+	f.Intrinsic.String.Build("{0}\6350.Zip",v.Caller.GasDir,v.Local.sRet)
+	f.Intrinsic.File.Exists(v.Local.sRet,v.Local.bExist)
+	f.Intrinsic.Control.If(v.Local.bExist,=,True)
+		f.Automation.Zip.UnZip(v.Local.sRet,v.Global.sFolder)
+	f.Intrinsic.Control.EndIf
+f.Intrinsic.Control.EndIf
+
+Program.Sub.Extract.End
+
+Program.Sub.LoadData.Start
+v.Local.sLogoPath.Declare
+v.Local.sFileName.Declare
+v.Local.iSleep.Declare
+v.Local.iCutoff.Declare
+v.Local.bExist.Declare
+v.Local.bEnabled.Declare
+f.ODBC.Connection!Conx.OpenCompanyConnection
+
+
+
+'f.ODBC.Connection!Conx.ExecuteAndReturn("Select RTRIM(LOGO),Refresh_rate,cutoff from GCG_6350_HTML_CONFIG",v.Local.sLogoPath)
+
+f.Data.Datatable.CreateFromSQL("ConfigDt","Conx","Select RTRIM(LOGO) as Logo,Refresh_rate,cutoff from GCG_6350_HTML_CONFIG")
+
+f.Intrinsic.Control.If(v.DataTable.ConfigDt.RowCount,>,0)
+	v.Local.sLogoPath.Set(v.DataTable.ConfigDt(0).Logo!fieldValTrim)
+	v.Local.iSleep.Set(v.DataTable.ConfigDt(0).Refresh_rate!fieldVal)
+	v.Local.iCutoff.Set(v.DataTable.ConfigDt(0).cutoff!fieldVal)
+f.Intrinsic.Control.EndIf
+
+
+f.Intrinsic.Control.If(v.Local.sLogoPath.Trim,<>,"")
+	f.Intrinsic.File.Exists(v.Local.sLogoPath,v.Local.bExist)
+	f.Intrinsic.Control.If(v.local.bExist)
+		v.Global.sFQPLogo.Set(v.local.sLogoPath)
+		f.Intrinsic.File.GetFileNameFromFQN(v.Local.sLogoPath,v.Local.sFileName)
+		gui.FMaint.txtLogo.Text(v.Local.sFileName)
+	f.Intrinsic.Control.EndIf
+f.Intrinsic.Control.EndIf
+
+
+f.Intrinsic.control.If(v.Local.iSleep,<>,0)
+	gui.FMaint.txtRefresh.Text(v.Local.iSleep)
+f.Intrinsic.Control.EndIf
+
+
+f.Intrinsic.control.If(v.Local.iCutoff,<>,0)
+	gui.FMaint.txtCutoff.Text(v.Local.iCutoff)
+f.Intrinsic.Control.EndIf
+
+'f.Data.Datatable.CreateFromSQL("WgDT","Conx","Select b.enabled,a.WORK_GROUP,a.DESCR,'W' as Line_type from V_WORKGROUP_HEAD a left join GCG_6350_HTML_CONFIG b on a.work_group = b.work_group and b.line_type = 'W'",True)
+'f.odbc.Connection!conx.ExecuteAndReturn("Select Enabled from GCG_6350_HTML_CONFIG where line_type = 'W' and WORK_GROUP = 'ZOUT'",v.Local.bExist)
+
+'F.Data.Datatable.AddRow("WgDT","enabled",v.Local.bExist,"WORK_GROUP","ZOUT","DESCR","Outside Process as a group","LINE_TYPE","W")
+
+
+'gui.FMaint.GsGCWorkGroups.AddGridviewFromDatatable("GVwWG","WgDT")
+
+'Gui.FMaint.GsGCWorkGroups.SetColumnProperty("GVwWG","Line_type","Visible","False")
+
+'Gui.FMaint.GsGCWorkGroups.SetColumnProperty("GVwWG","enabled","Width","50")
+'Gui.FMaint.GsGCWorkGroups.SetColumnProperty("GVwWG","WORK_GROUP","Width","80")
+'Gui.FMaint.GsGCWorkGroups.SetColumnProperty("GVwWG","DESCR","Width","200")
+
+'Gui.FMaint.GsGCWorkGroups.SetColumnProperty("GVwWG","enabled","Caption","Enabled?")
+'Gui.FMaint.GsGCWorkGroups.SetColumnProperty("GVwWG","WORK_GROUP","Caption","Work Group")
+'Gui.FMaint.GsGCWorkGroups.SetColumnProperty("GVwWG","DESCR","Caption","Description")
+
+'Gui.FMaint.GsGCWorkGroups.SetColumnProperty("GVwWG","enabled","ReadOnly","False")
+'Gui.FMaint.GsGCWorkGroups.SetColumnProperty("GVwWG","WORK_GROUP","ReadOnly","True")
+'Gui.FMaint.GsGCWorkGroups.SetColumnProperty("GVwWG","DESCR","ReadOnly","True")
+
+'Gui.FMaint.GsGCWorkGroups.SetColumnProperty("GVwWG","enabled","AllowEdit","True")
+'Gui.FMaint.GsGCWorkGroups.SetColumnProperty("GVwWG","WORK_GROUP","AllowEdit","False")
+'Gui.FMaint.GsGCWorkGroups.SetColumnProperty("GVwWG","DESCR","AllowEdit","False")
+
+'Gui.FMaint.GsGCWorkGroups.SetColumnProperty("GVwWG","enabled","HeaderFontBold","True")
+'Gui.FMaint.GsGCWorkGroups.SetColumnProperty("GVwWG","WORK_GROUP","HeaderFontBold","False")
+'Gui.FMaint.GsGCWorkGroups.SetColumnProperty("GVwWG","DESCR","HeaderFontBold","False")
+
+'gui.FMaint.GsGCWorkGroups.MainView("GVwWG")
+
+Program.Sub.LoadData.End
+
+Program.Sub.Comments.Start
+${$5$}$3.0.0.0$}$1
+${$6$}$adsouza$}$20210817122609833$}$JX3L09Cgehg7O+lKYSb2ur8FFsJUp9u/UR871R+yN/7ez56V5Tu302bfvxvzsEC79fuS0QFa6pc=
+Program.Sub.Comments.End
